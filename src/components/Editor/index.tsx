@@ -24,42 +24,12 @@ import {
   linkPlugin,
   tablePlugin,
   codeBlockPlugin,
-  sandpackPlugin,
   codeMirrorPlugin,
-  SandpackConfig,
   ConditionalContents,
-  InsertSandpack,
   ChangeCodeMirrorLanguage,
-  ShowSandpackInfo,
   frontmatterPlugin,
+  imagePlugin,
 } from "@mdxeditor/editor";
-
-const defaultSnippetContent = `
-export default function App() {
-  return (
-    <div className="App">
-      <h1>Hello CodeSandbox</h1>
-      <h2>Start editing to see some magic happen!</h2>
-    </div>
-  );
-}
-`.trim();
-
-const simpleSandpackConfig: SandpackConfig = {
-  defaultPreset: "react",
-  presets: [
-    {
-      label: "React",
-      name: "react",
-      meta: "live react",
-      sandpackTemplate: "react",
-      sandpackTheme: "light",
-      snippetFileName: "/App.js",
-      snippetLanguage: "jsx",
-      initialSnippetContent: defaultSnippetContent,
-    },
-  ],
-};
 
 function Editor({
   diffMarkdown,
@@ -77,8 +47,8 @@ function Editor({
         linkPlugin(),
         tablePlugin(),
         frontmatterPlugin(),
+        imagePlugin(),
         codeBlockPlugin({ defaultCodeBlockLanguage: "js" }),
-        sandpackPlugin({ sandpackConfig: simpleSandpackConfig }),
         codeMirrorPlugin({
           codeBlockLanguages: { js: "JavaScript", css: "CSS" },
         }),
@@ -107,14 +77,9 @@ function Editor({
                     contents: () => <ChangeCodeMirrorLanguage />,
                   },
                   {
-                    when: (editor) => editor?.editorType === "sandpack",
-                    contents: () => <ShowSandpackInfo />,
-                  },
-                  {
                     fallback: () => (
                       <>
                         <InsertCodeBlock />
-                        <InsertSandpack />
                       </>
                     ),
                   },

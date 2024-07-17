@@ -7,8 +7,6 @@ const contents = import.meta.glob("./contents/**/*.(md|mdx)", {
   query: "?raw",
 });
 
-console.log(contents);
-
 const App = () => {
   const [selectedFile, setSelectedFile] = useState<Key | null>(null);
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
@@ -36,7 +34,7 @@ const App = () => {
           <Directory contents={contents} onSelect={handleSelect} />
         </Panel>
         <PanelResizeHandle style={{ borderRight: "1px solid #111" }} />
-        <Panel defaultSize={75}>
+        <Panel defaultSize={75} style={{ overflow: "auto" }}>
           {selectedContent && (
             <Editor markdown={selectedContent} diffMarkdown={selectedContent} />
           )}
