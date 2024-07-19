@@ -11,7 +11,12 @@
   },
   "dependencies": {
     "@mdxeditor/editor": "^3.8.0",
+    "@nanostores/react": "^0.7.2",
+    "ahooks": "^3.8.0",
     "antd": "^5.19.1",
+    "axios": "^1.7.2",
+    "dayjs": "^1.11.12",
+    "nanostores": "^0.10.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-resizable-panels": "^2.0.20",
