@@ -18,15 +18,19 @@ import {
   deleteContent,
   updateContent,
   undoContent,
+  contentExist,
   type Content,
+  fillContent,
 } from "./stores/content";
 import { Modal, Select, Space, Table } from "antd";
 import dayjs from "dayjs";
+import { getFiles } from "./services/files";
 
 const formatPath = (content: Content) => {
   let path = content.path;
-  if (content.newPath) {
-    path += ` (${content.newPath})`;
+
+  if (content.isCreated) {
+    path += " (created)";
   }
 
   if (content.isDeleted) {
@@ -37,35 +41,80 @@ const formatPath = (content: Content) => {
     path += " (edited)";
   }
 
-  if (content.isCreated) {
-    path += " (created)";
+  if (content.newPath) {
+    path += ` (${content.newPath})`;
   }
 
   return path;
 };
 
+const getAction = (d: Content) => {
+  if (d.isCreated) return "create";
+  if (d.isDeleted) return "delete";
+  if (d.newPath) return "move";
+
+  return "update";
+};
+
+const CommitMessage = (props: { commit: string; touched: Content[] }) => {
+  const { commit, touched } = props;
+
+  return (
+    <div>
+      <p>Are you sure to commit the changes?</p>
+      <p>Commit message: {commit}</p>
+      <Table
+        size="small"
+        dataSource={touched}
+        rowKey={(d) => d.path}
+        pagination={false}
+        columns={[
+          {
+            title: "Path",
+            dataIndex: "path",
+          },
+          {
+            title: "Actions",
+            dataIndex: "path",
+            render: (_, record) => getAction(record),
+          },
+        ]}
+      />
+    </div>
+  );
+};
+
 const App = () => {
-  const [key, setKey] = useState<string | undefined>(undefined);
+  const [path, setPath] = useState<string | undefined>(undefined);
   const [content, setContent] = useState<Content | undefined>(undefined);
   const [branch, setBranch] = useState<string>("main");
 
   const contents = useStore($contents);
   const touched = useStore($touched);
 
-  const { loading, run: fetch } = useRequest(getTree, {
+  const { data: branches } = useRequest(getBranches);
+
+  const { loading: loadingTree, run: fetch } = useRequest(getTree, {
     onSuccess: initContents,
-    onFinally: () => {
-      setKey(undefined);
-    },
+    onFinally: () => setPath(undefined),
   });
 
-  const { data: branches } = useRequest(getBranches);
+  const { loading: loadingFile, run: fetchFile } = useRequest(getFiles, {
+    manual: true,
+    onSuccess: (data, params) => {
+      const path = params[0]?.path;
+      if (path) {
+        fillContent(path, data);
+        setPath(path);
+      }
+    },
+  });
 
   const { run: runCommit, loading: loadingCommit } = useRequest(commits, {
     manual: true,
     onSuccess: () => {
       fetch();
-      setKey(undefined);
+      setPath(undefined);
     },
   });
 
@@ -75,17 +124,17 @@ const App = () => {
 
   const handleRename = (oldPath: string, newPath: string) => {
     renameContent(oldPath, newPath);
-    setKey(undefined);
+    setPath(undefined);
   };
 
   const handleDelete = (path: string) => {
     deleteContent(path);
-    setKey(undefined);
+    setPath(undefined);
   };
 
   const handleUndo = (path: string) => {
     undoContent(path);
-    setKey(undefined);
+    setPath(undefined);
   };
 
   const handleUpdateContent = (newContent: string) => {
@@ -105,58 +154,25 @@ const App = () => {
   };
 
   const handleCommit = (commit: string) => {
+    if (touched.length === 0) {
+      Modal.info({ title: "Commit", content: "No changes to commit" });
+      return;
+    }
+
     Modal.confirm({
       title: "Commit",
       width: 800,
-      content: (
-        <div>
-          <p>Are you sure to commit the changes?</p>
-          <p>Commit message: {commit}</p>
-          <Table
-            size="small"
-            dataSource={touched}
-            rowKey={(d) => d.path}
-            pagination={false}
-            columns={[
-              {
-                title: "Path",
-                dataIndex: "path",
-              },
-              {
-                title: "Is Edited",
-                dataIndex: "isEdited",
-                render: (d) => (d ? "Yes" : "No"),
-              },
-              {
-                title: "Is Deleted",
-                dataIndex: "isDeleted",
-                render: (d) => (d ? "Yes" : "No"),
-              },
-              {
-                title: "Is Created",
-                dataIndex: "isCreated",
-                render: (d) => (d ? "Yes" : "No"),
-              },
-            ]}
-          />
-        </div>
-      ),
+      content: <CommitMessage commit={commit} touched={touched} />,
       okButtonProps: { loading: loadingCommit },
       onOk: () => {
         const date = dayjs().format("YYYYMMDDHHmmss");
 
         runCommit({
-          branch: `main-${date}`,
+          branch: `update-${date}`,
           start_branch: branch,
           commit_message: commit,
           actions: touched.map((d) => {
-            const action = d.isCreated
-              ? "create"
-              : d.isDeleted
-              ? "delete"
-              : d.newPath
-              ? "move"
-              : "update";
+            const action = getAction(d);
 
             const file_path = d.newPath || d.path;
             const previous_path = action === "move" ? d.path : undefined;
@@ -170,31 +186,40 @@ const App = () => {
   };
 
   const handleSelect = (key: Key) => {
-    setKey(key as string);
+    const pathName = key as string;
+
+    if (contentExist(pathName)) {
+      setPath(pathName);
+    } else {
+      fetchFile({ path: pathName, ref: branch });
+    }
 
     // empty content, cause Editor need to be re-rendered
     setContent(undefined);
   };
 
   useEffect(() => {
-    const content = getContent(key as string);
+    const content = getContent(path as string);
     setContent(content);
-  }, [key]);
+  }, [path]);
 
   return (
     <>
-      {loading && <Loading />}
       <div>
         <PanelGroup direction="horizontal" style={{ height: "100vh" }}>
           <Panel defaultSize={25}>
             <Space direction="vertical" style={{ width: "100%" }}>
               <Select
                 style={{ width: "100%" }}
-                options={branches?.map((value) => ({ label: value, value }))}
                 placeholder="Select a branch"
                 onChange={handleFetchBranch}
                 value={branch}
+                options={branches?.map(({ name }) => ({
+                  label: name,
+                  value: name,
+                }))}
               />
+              {loadingTree && <Loading />}
               <Directory
                 multiple={false}
                 treeData={contents.map((d) => ({
@@ -202,6 +227,7 @@ const App = () => {
                   title: formatPath(d),
                   isLeaf: true,
                 }))}
+                selectedKeys={path ? [path] : []}
                 onSingleSelect={handleSelect}
                 onRename={handleRename}
                 onAdd={handleAdd}
@@ -213,10 +239,11 @@ const App = () => {
           </Panel>
           <PanelResizeHandle style={{ borderRight: "1px solid #111" }} />
           <Panel defaultSize={75} style={{ overflow: "auto" }}>
+            {loadingFile && <Loading />}
             {content && (
               <Editor
-                markdown={content.newContent || content.content}
-                diffMarkdown={content.content}
+                markdown={content.newContent || content.content || ""}
+                diffMarkdown={content.content || ""}
                 onSave={handleUpdateContent}
               />
             )}

@@ -5,18 +5,25 @@ interface TreeParams {
   ref?: string;
 }
 
+interface Tree {
+  id: string;
+  name: string;
+  type: string;
+  path: string;
+}
+
 export async function getTree(params?: TreeParams) {
   try {
     const { path, ref } = params || {};
 
-    const response = await instance.get<Record<string, string>>("/tree", {
+    const response = await instance.get<Tree[]>("/tree", {
       params: { path, ref },
     });
 
-    return response.data;
+    return response.data.filter((d) => d.type === "blob");
   } catch (error) {
     console.error(error);
 
-    return {};
+    return [];
   }
 }

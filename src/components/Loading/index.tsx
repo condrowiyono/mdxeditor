@@ -8,7 +8,6 @@ const Loading = () => {
         justifyContent: "center",
         alignItems: "center",
         height: "100vh",
-        background: "rgba(0, 0, 0, 0.1)",
       }}
     >
       <Spin />
